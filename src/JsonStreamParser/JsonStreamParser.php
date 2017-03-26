@@ -120,6 +120,18 @@ class JsonStreamParser
 						continue;
 					}
 
+					if ($this->isStartOfKeyword($char)) {
+						$value = $this->consumeKeyword($generator);
+						$this->decoder->appendValue($value);
+						continue;
+					}
+
+					if (is_numeric($char)) {
+						$value = $this->consumeNumber($generator);
+						$this->decoder->appendValue($value);
+						continue;
+					}
+
 					throw new ParseException("Unknown character: $char");
 			}
 		}
@@ -159,6 +171,66 @@ class JsonStreamParser
 
 		// if we end up here, we never got an enclosure
 		throw new ParseException('Encountered end of stream while inside a string.');
+	}
+
+	/**
+	 * @param string $char
+	 *
+	 * @return bool
+	 */
+	private function isStartOfKeyword(string $char): bool
+	{
+		// true, false, null
+		return in_array(mb_strtolower($char), ['t', 'f', 'n']);
+	}
+
+	/**
+	 * @param \Generator $generator
+	 *
+	 * @return bool|null
+	 * @throws ParseException
+	 */
+	private function consumeKeyword(\Generator $generator)
+	{
+		$keyword = '';
+
+		// cursor is already on the first character
+		do {
+			$keyword .= mb_strtolower($generator->current());
+
+			if (array_key_exists($keyword, JsonDefinition::KEYWORDS)) {
+				return JsonDefinition::KEYWORDS[$keyword];
+			}
+
+			$generator->next();
+		} while ($generator->valid());
+
+		// there was a typo
+		throw new ParseException('Encountered end of stream while inside a keyword.');
+	}
+
+	/**
+	 * @param \Generator $generator
+	 *
+	 * @return float|int
+	 * @throws ParseException
+	 */
+	private function consumeNumber(\Generator $generator)
+	{
+		$number = '';
+		$isInt  = true;
+
+		// cursor is already on the first character
+		do {
+			$number .= mb_strtolower($generator->current());
+			$generator->next();
+		} while ($generator->valid());
+
+		if ($isInt) {
+			return (int)$number;
+		}
+
+		return (float)$number;
 	}
 
 	/**

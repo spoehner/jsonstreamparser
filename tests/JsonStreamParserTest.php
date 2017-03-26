@@ -222,6 +222,37 @@ class JsonStreamParserTest extends TestCase
 		$subject->parse($this->stream);
 	}
 
+	/**
+	 * @expectedException \JsonStreamParser\Exception\ParseException
+	 * @expectedExceptionMessageRegExp  /end of stream.* keyword/
+	 */
+	public function testParseErrorKeywordTypo()
+	{
+		$this->fillStream('ture');
+
+		$subject = new JsonStreamParser($this->configuration, $this->decoder);
+		$subject->parse($this->stream);
+	}
+
+	/**
+	 * @param mixed $input
+	 *
+	 * @dataProvider scalarProvider
+	 */
+	public function testParseScalar($input)
+	{
+		$this->fillStream(json_encode($input));
+		$this->decoder->expects($this->once())->method('appendValue')->with($input);
+
+		$subject = new JsonStreamParser($this->configuration, $this->decoder);
+		$subject->parse($this->stream);
+	}
+
+	public function scalarProvider()
+	{
+		return [[1], [123], [1.23], [1.3e10], [[123, 456, 1.23]], [true], [false], [null]];
+	}
+
 	public function testParse()
 	{
 		$this->decoder->expects($this->once())->method('endOfStream');

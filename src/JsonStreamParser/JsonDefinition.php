@@ -11,6 +11,7 @@ namespace JsonStreamParser;
 abstract class JsonDefinition
 {
 	const WHITESPACE          = [" ", "\t", "\n", "\r"];
+	const KEYWORDS            = ['true' => true, 'false' => false, 'null' => null];
 	const BEGIN_OBJECT        = '{';
 	const END_OBJECT          = '}';
 	const BEGIN_ARRAY         = '[';

@@ -87,4 +87,20 @@ class DecoderTest extends TestCase
 		$subject->beginObject();
 		$subject->keyValueSeparator();
 	}
+
+	/**
+	 * @param mixed $input
+	 * @dataProvider scalarProvider
+	 */
+	public function testScalarValues($input)
+	{
+		$subject = new Decoder();
+		$subject->appendValue($input);
+		$this->assertSame($input, $subject->getResult());
+	}
+
+	public function scalarProvider()
+	{
+		return [[1], [123], [1.23], [1.3e10], [true], [false], [null]];
+	}
 }
