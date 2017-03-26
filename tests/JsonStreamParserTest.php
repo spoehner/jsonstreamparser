@@ -98,6 +98,18 @@ class JsonStreamParserTest extends TestCase
 		$subject->parse($this->stream);
 	}
 
+	/**
+	 * @expectedException \JsonStreamParser\Exception\ParseException
+	 * @expectedExceptionMessage end of stream
+	 */
+	public function testParseError()
+	{
+		$this->fillStream('{');
+
+		$subject = new JsonStreamParser($this->configuration, $this->decoder);
+		$subject->parse($this->stream);
+	}
+
 	public function testParsePrimitiveObject()
 	{
 		$this->fillStream('{}');
@@ -158,7 +170,7 @@ class JsonStreamParserTest extends TestCase
 		$string = 'foobar';
 		$this->fillStream('"'.$string.'"');
 
-		$this->decoder->expects($this->once())->method('foundString')->with($string);
+		$this->decoder->expects($this->once())->method('appendValue')->with($string);
 
 		$subject = new JsonStreamParser($this->configuration, $this->decoder);
 		$subject->parse($this->stream);

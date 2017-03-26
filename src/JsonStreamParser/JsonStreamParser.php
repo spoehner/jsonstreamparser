@@ -13,8 +13,9 @@ use JsonStreamParser\Exception\ParseException;
  */
 class JsonStreamParser
 {
-	const STATE_NOTHING = 1;
+	const STATE_NOTHING  = 1;
 	const STATE_IN_ARRAY = 2;
+	const STATE_IN_OBJECT = 3;
 
 	/**
 	 * @var Configuration
@@ -75,28 +76,37 @@ class JsonStreamParser
 
 	private function doParse()
 	{
+		$state = self::STATE_NOTHING;
+
 		$generator = $this->buffer->get();
 		foreach ($generator as $char) {
 			switch ($char) {
 				case JsonDefinition::BEGIN_OBJECT:
+					$state = self::STATE_IN_OBJECT;
 					$this->decoder->beginObject();
 				break;
 
 				case JsonDefinition::END_OBJECT:
+					$state = self::STATE_NOTHING;
 					$this->decoder->endObject();
 				break;
 
 				case JsonDefinition::BEGIN_ARRAY:
+					$state = self::STATE_IN_ARRAY;
 					$this->decoder->beginArray();
 				break;
 
 				case JsonDefinition::END_ARRAY:
+					$state = self::STATE_NOTHING;
 					$this->decoder->endArray();
+				break;
+
+				case JsonDefinition::ARRAY_SEPARATOR:
 				break;
 
 				case JsonDefinition::STRING_ENCLOSURE:
 					$string = $this->consumeString($generator);
-					$this->decoder->foundString($string);
+					$this->decoder->appendValue($string);
 				break;
 
 				default:
@@ -107,6 +117,10 @@ class JsonStreamParser
 
 					throw new ParseException("Unknown character: $char");
 			}
+		}
+
+		if ($state != self::STATE_NOTHING) {
+			throw new ParseException('Unexpected end of stream');
 		}
 
 		$this->decoder->endOfStream();
