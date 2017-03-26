@@ -81,6 +81,20 @@ class Decoder
 	{
 	}
 
+	public function keyValueSeparator()
+	{
+		if (!$this->current instanceof Element || $this->current->type != Element::TYPE_KEY) {
+			throw new \UnexpectedValueException('Not in object context.');
+		}
+	}
+
+	public function arraySeparator()
+	{
+		if (!$this->current instanceof Element || !in_array($this->current->type, [Element::TYPE_ARRAY, Element::TYPE_OBJECT])) {
+			throw new \UnexpectedValueException('Not in array or object context.');
+		}
+	}
+
 	/**
 	 * @return mixed
 	 */

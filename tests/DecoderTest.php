@@ -76,4 +76,15 @@ class DecoderTest extends TestCase
 		$subject->endObject();
 		$this->assertEquals((object)['key1' => 'value1', 'key2' => 'value2'], $subject->getResult());
 	}
+
+	/**
+	 * @expectedException \UnexpectedValueException
+	 * @expectedExceptionMessage object
+	 */
+	public function testUnexpectedKeyValueSeparator()
+	{
+		$subject = new Decoder();
+		$subject->beginObject();
+		$subject->keyValueSeparator();
+	}
 }

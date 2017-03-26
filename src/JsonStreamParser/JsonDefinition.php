@@ -10,11 +10,12 @@ namespace JsonStreamParser;
  */
 abstract class JsonDefinition
 {
-	const WHITESPACE       = [" ", "\t", "\n", "\r"];
-	const BEGIN_OBJECT     = '{';
-	const END_OBJECT       = '}';
-	const BEGIN_ARRAY      = '[';
-	const END_ARRAY        = ']';
-	const STRING_ENCLOSURE = '"';
-	const ARRAY_SEPARATOR  = ',';
+	const WHITESPACE          = [" ", "\t", "\n", "\r"];
+	const BEGIN_OBJECT        = '{';
+	const END_OBJECT          = '}';
+	const BEGIN_ARRAY         = '[';
+	const END_ARRAY           = ']';
+	const STRING_ENCLOSURE    = '"';
+	const ARRAY_SEPARATOR     = ',';
+	const KEY_VALUE_SEPARATOR = ':';
 }

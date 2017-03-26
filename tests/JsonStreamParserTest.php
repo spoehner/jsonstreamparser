@@ -99,15 +99,22 @@ class JsonStreamParserTest extends TestCase
 	}
 
 	/**
+	 * @param string $input
+	 *
 	 * @expectedException \JsonStreamParser\Exception\ParseException
-	 * @expectedExceptionMessage end of stream
+	 * @dataProvider errorProvider
 	 */
-	public function testParseError()
+	public function testParseError(string $input)
 	{
-		$this->fillStream('{');
+		$this->fillStream($input);
 
 		$subject = new JsonStreamParser($this->configuration, $this->decoder);
 		$subject->parse($this->stream);
+	}
+
+	public function errorProvider()
+	{
+		return [['{']];
 	}
 
 	public function testParsePrimitiveObject()
@@ -115,6 +122,20 @@ class JsonStreamParserTest extends TestCase
 		$this->fillStream('{}');
 
 		$this->decoder->expects($this->once())->method('beginObject');
+		$this->decoder->expects($this->once())->method('endObject');
+
+		$subject = new JsonStreamParser($this->configuration, $this->decoder);
+		$subject->parse($this->stream);
+	}
+
+	public function testParseObject()
+	{
+		$this->fillStream('{"key":"value"}');
+
+		$this->decoder->expects($this->once())->method('beginObject');
+		$this->decoder->expects($this->at(1))->method('appendValue')->with('key');
+		$this->decoder->expects($this->once())->method('keyValueSeparator');
+		$this->decoder->expects($this->at(3))->method('appendValue')->with('value');
 		$this->decoder->expects($this->once())->method('endObject');
 
 		$subject = new JsonStreamParser($this->configuration, $this->decoder);
@@ -132,6 +153,18 @@ class JsonStreamParserTest extends TestCase
 		$subject->parse($this->stream);
 	}
 
+	public function testParseArray()
+	{
+		$this->fillStream('["foobar"]');
+
+		$this->decoder->expects($this->once())->method('beginArray');
+		$this->decoder->expects($this->once())->method('appendValue')->with('foobar');
+		$this->decoder->expects($this->once())->method('endArray');
+
+		$subject = new JsonStreamParser($this->configuration, $this->decoder);
+		$subject->parse($this->stream);
+	}
+
 	public function testParseArrayOfEmptyObjects()
 	{
 		$this->fillStream('[{}, {}]');
@@ -140,6 +173,7 @@ class JsonStreamParserTest extends TestCase
 		$this->decoder->expects($this->once())->method('endArray');
 		$this->decoder->expects($this->exactly(2))->method('beginObject');
 		$this->decoder->expects($this->exactly(2))->method('endObject');
+		$this->decoder->expects($this->once())->method('arraySeparator');
 
 		$subject = new JsonStreamParser($this->configuration, $this->decoder);
 		$subject->parse($this->stream);

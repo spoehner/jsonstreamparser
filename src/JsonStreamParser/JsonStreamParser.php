@@ -13,8 +13,8 @@ use JsonStreamParser\Exception\ParseException;
  */
 class JsonStreamParser
 {
-	const STATE_NOTHING  = 1;
-	const STATE_IN_ARRAY = 2;
+	const STATE_NOTHING   = 1;
+	const STATE_IN_ARRAY  = 2;
 	const STATE_IN_OBJECT = 3;
 
 	/**
@@ -76,32 +76,37 @@ class JsonStreamParser
 
 	private function doParse()
 	{
-		$state = self::STATE_NOTHING;
+		$nestingLevel = 0;
 
 		$generator = $this->buffer->get();
 		foreach ($generator as $char) {
 			switch ($char) {
 				case JsonDefinition::BEGIN_OBJECT:
-					$state = self::STATE_IN_OBJECT;
+					$nestingLevel++;
 					$this->decoder->beginObject();
 				break;
 
 				case JsonDefinition::END_OBJECT:
-					$state = self::STATE_NOTHING;
+					$nestingLevel--;
 					$this->decoder->endObject();
 				break;
 
 				case JsonDefinition::BEGIN_ARRAY:
-					$state = self::STATE_IN_ARRAY;
+					$nestingLevel++;
 					$this->decoder->beginArray();
 				break;
 
 				case JsonDefinition::END_ARRAY:
-					$state = self::STATE_NOTHING;
+					$nestingLevel--;
 					$this->decoder->endArray();
 				break;
 
 				case JsonDefinition::ARRAY_SEPARATOR:
+					$this->decoder->arraySeparator();
+				break;
+
+				case JsonDefinition::KEY_VALUE_SEPARATOR:
+					$this->decoder->keyValueSeparator();
 				break;
 
 				case JsonDefinition::STRING_ENCLOSURE:
@@ -119,7 +124,7 @@ class JsonStreamParser
 			}
 		}
 
-		if ($state != self::STATE_NOTHING) {
+		if ($nestingLevel != 0) {
 			throw new ParseException('Unexpected end of stream');
 		}
 
@@ -140,7 +145,6 @@ class JsonStreamParser
 		$generator->next();
 		while ($generator->valid()) {
 			$char = $generator->current();
-			$generator->next();
 
 			// read until we reach another enclosure
 			if ($char === JsonDefinition::STRING_ENCLOSURE) {
@@ -148,6 +152,9 @@ class JsonStreamParser
 			}
 
 			$string .= $char;
+
+			// keep this after the return; otherwise the foreach of doParse will skip one char
+			$generator->next();
 		}
 
 		// if we end up here, we never got an enclosure
