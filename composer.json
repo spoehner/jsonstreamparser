@@ -1,0 +1,27 @@
+{
+  "name": "spoehner/jsonstreamparser",
+  "type": "library",
+  "description": "",
+  "homepage": "https://github.com/spoehner/jsonstreamparser",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Stefan Pöhner",
+      "email": "github@poe-php.de",
+      "homepage": "https://poe-php.de"
+    }
+  ],
+  "autoload": {
+    "psr-4": {"JsonStreamParser\\": "src/JsonStreamParser/"}
+  },
+  "extra": {
+
+  },
+  "require-dev": {
+    "php": ">=7.0",
+    "phpunit/phpunit": "^6.0"
+  },
+  "scripts": {
+    "test": "vendor/bin/phpunit"
+  }
+}
