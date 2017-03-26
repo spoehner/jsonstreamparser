@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace JsonStreamParser;
 
+use JsonStreamParser\Exception\ParseException;
+
 /**
  * @author  Stefan Pöhner <github@poe-php.de>
  * @license MIT
@@ -11,6 +13,9 @@ namespace JsonStreamParser;
  */
 class JsonStreamParser
 {
+	const STATE_NOTHING = 1;
+	const STATE_IN_ARRAY = 2;
+
 	/**
 	 * @var Configuration
 	 */
@@ -22,13 +27,20 @@ class JsonStreamParser
 	private $buffer;
 
 	/**
+	 * @var Decoder
+	 */
+	private $decoder;
+
+	/**
 	 * JsonStreamParser constructor.
 	 *
 	 * @param Configuration $config
+	 * @param Decoder       $decoder
 	 */
-	public function __construct(Configuration $config)
+	public function __construct(Configuration $config, Decoder $decoder)
 	{
-		$this->config = $config;
+		$this->config  = $config;
+		$this->decoder = $decoder;
 	}
 
 	/**
@@ -49,10 +61,92 @@ class JsonStreamParser
 			throw new \InvalidArgumentException('Missing buffer class.');
 		}
 
-		$cn = $this->config->bufferClass;
+		$cn           = $this->config->bufferClass;
 		$this->buffer = new $cn();
 		if (!$this->buffer instanceof Buffer) {
 			throw new \InvalidArgumentException('Incompatible buffer class.');
 		}
+
+		$this->buffer->setStream($stream);
+		$this->buffer->setSize($this->config->bufferSize);
+
+		$this->doParse();
+	}
+
+	private function doParse()
+	{
+		$generator = $this->buffer->get();
+		foreach ($generator as $char) {
+			switch ($char) {
+				case JsonDefinition::BEGIN_OBJECT:
+					$this->decoder->beginObject();
+				break;
+
+				case JsonDefinition::END_OBJECT:
+					$this->decoder->endObject();
+				break;
+
+				case JsonDefinition::BEGIN_ARRAY:
+					$this->decoder->beginArray();
+				break;
+
+				case JsonDefinition::END_ARRAY:
+					$this->decoder->endArray();
+				break;
+
+				case JsonDefinition::STRING_ENCLOSURE:
+					$string = $this->consumeString($generator);
+					$this->decoder->foundString($string);
+				break;
+
+				default:
+					if ($this->isWhitespace($char)) {
+						$this->decoder->whitespace($char);
+						continue;
+					}
+
+					throw new ParseException("Unknown character: $char");
+			}
+		}
+
+		$this->decoder->endOfStream();
+	}
+
+	/**
+	 * @param \Generator $generator
+	 *
+	 * @return string
+	 * @throws ParseException
+	 */
+	private function consumeString(\Generator $generator): string
+	{
+		$string = '';
+
+		// the cursor is at the opening enclosure, so advance
+		$generator->next();
+		while ($generator->valid()) {
+			$char = $generator->current();
+			$generator->next();
+
+			// read until we reach another enclosure
+			if ($char === JsonDefinition::STRING_ENCLOSURE) {
+				return $string;
+			}
+
+			$string .= $char;
+		}
+
+		// if we end up here, we never got an enclosure
+		throw new ParseException('Encountered end of stream while inside a string.');
+	}
+
+	/**
+	 * @param string $char
+	 *
+	 * @return bool
+	 */
+	private function isWhitespace(string $char): bool
+	{
+		return in_array($char, JsonDefinition::WHITESPACE);
 	}
 }
