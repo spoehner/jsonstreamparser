@@ -88,6 +88,18 @@ class JsonStreamParserTest extends TestCase
 		$subject->parse($this->stream);
 	}
 
+	/**
+	 * @expectedException \JsonStreamParser\Exception\ParseException
+	 * @expectedExceptionMessage Unknown character
+	 */
+	public function testParseErrorUnknownCharacter()
+	{
+		$this->fillStream('a');
+
+		$subject = new JsonStreamParser($this->configuration, $this->decoder);
+		$subject->parse($this->stream);
+	}
+
 	public function testParseEmptyStream()
 	{
 		$this->fillStream('');
@@ -250,12 +262,12 @@ class JsonStreamParserTest extends TestCase
 
 	public function scalarProvider()
 	{
-		return [[1], [123], [1.23], [1.3e10], [true], [false], [null]];
+		return [[1], [123], [1.23], [1.3e10], [-12], [1.2e-3], [-1e-2], [true], [false], [null]];
 	}
 
 	public function testParseArrayOfNumbers()
 	{
-		$this->fillStream(json_encode([123, 456, 1.23]));
+		$this->fillStream(json_encode([123, 456, 1.23, -1]));
 		$this->decoder->expects($this->once())->method('beginArray');
 		$this->decoder->expects($this->at(1))->method('appendValue')->with(123);
 		$this->decoder->expects($this->at(2))->method('arraySeparator');
@@ -269,14 +281,26 @@ class JsonStreamParserTest extends TestCase
 	}
 
 	/**
+	 * @expectedException \JsonStreamParser\Exception\ParseException
+	 * @expectedExceptionMessage number format
+	 */
+	public function testParseNumberError()
+	{
+		$this->fillStream('1ea23');
+
+		$subject = new JsonStreamParser($this->configuration, $this->decoder);
+		$subject->parse($this->stream);
+	}
+
+	/**
 	 * @param string $string
 	 *
 	 * @dataProvider specialProvider
 	 */
 	public function testParseSpecialCharacters(string $string)
 	{
-		$this->fillStream(json_encode($string));
-		$this->decoder->expects($this->once())->method('appendValue')->with($string);
+		$this->fillStream('"'.$string.'"');
+		$this->decoder->expects($this->once())->method('appendValue')->with(json_decode('"'.$string.'"'));
 
 		$subject = new JsonStreamParser($this->configuration, $this->decoder);
 		$subject->parse($this->stream);
@@ -284,7 +308,7 @@ class JsonStreamParserTest extends TestCase
 
 	public function specialProvider()
 	{
-		return [['üâé'], ['\x07']];
+		return [['üâé'], ['ú™£¢∞§\u2665']];
 	}
 
 	public function testParse()

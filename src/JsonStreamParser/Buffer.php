@@ -44,8 +44,10 @@ class Buffer
 	public function get(): \Generator
 	{
 		while (!feof($this->stream)) {
-			$chunk  = fread($this->stream, $this->size);
-			$length = mb_strlen($chunk);
+			$chunk = fread($this->stream, $this->size);
+
+			$chunk  = preg_split("//u", $chunk, -1, PREG_SPLIT_NO_EMPTY);
+			$length = count($chunk);
 
 			for ($i = 0; $i < $length; $i++) {
 				yield $chunk[$i];

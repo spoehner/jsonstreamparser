@@ -148,7 +148,7 @@ class JsonStreamParser
 				} elseif ($this->isStartOfKeyword($this->currentChar)) {
 					$value = $this->consumeKeyword();
 					$this->decoder->appendValue($value);
-				} elseif (is_numeric($this->currentChar)) {
+				} elseif (is_numeric($this->currentChar) || $this->currentChar == '-') {
 					$value = $this->consumeNumber();
 					$this->decoder->appendValue($value);
 
@@ -177,10 +177,10 @@ class JsonStreamParser
 		$this->generator->next();
 		while ($this->generator->valid()) {
 			$char = $this->generator->current();
-
 			// read until we reach another enclosure
 			if ($char === JsonDefinition::STRING_ENCLOSURE) {
 				$decodedString = json_decode('"'.$string.'"');
+
 				return $decodedString;
 			}
 
@@ -236,7 +236,7 @@ class JsonStreamParser
 	{
 		$number           = '';
 		$isInt            = true;
-		$numberCharacters = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.', 'e'];
+		$numberCharacters = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '-', 'e'];
 
 		// cursor is already on the first character
 		do {
@@ -247,7 +247,7 @@ class JsonStreamParser
 					throw new ParseException("Unknown number format: $number");
 				}
 				break;
-			} elseif ($this->currentChar == '.') {
+			} elseif (in_array($this->currentChar, ['.', 'e'])) {
 				$isInt = false;
 			}
 
