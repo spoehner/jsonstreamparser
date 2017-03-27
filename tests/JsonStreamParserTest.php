@@ -250,7 +250,22 @@ class JsonStreamParserTest extends TestCase
 
 	public function scalarProvider()
 	{
-		return [[1], [123], [1.23], [1.3e10], [[123, 456, 1.23]], [true], [false], [null]];
+		return [[1], [123], [1.23], [1.3e10], [true], [false], [null]];
+	}
+
+	public function testParseArrayOfNumbers()
+	{
+		$this->fillStream(json_encode([123, 456, 1.23]));
+		$this->decoder->expects($this->once())->method('beginArray');
+		$this->decoder->expects($this->at(1))->method('appendValue')->with(123);
+		$this->decoder->expects($this->at(2))->method('arraySeparator');
+		$this->decoder->expects($this->at(3))->method('appendValue')->with(456);
+		$this->decoder->expects($this->at(4))->method('arraySeparator');
+		$this->decoder->expects($this->at(5))->method('appendValue')->with(1.23);
+		$this->decoder->expects($this->once())->method('endArray');
+
+		$subject = new JsonStreamParser($this->configuration, $this->decoder);
+		$subject->parse($this->stream);
 	}
 
 	public function testParse()

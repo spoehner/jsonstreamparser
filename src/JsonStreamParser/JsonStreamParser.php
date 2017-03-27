@@ -33,6 +33,21 @@ class JsonStreamParser
 	private $decoder;
 
 	/**
+	 * @var \Generator
+	 */
+	private $generator;
+
+	/**
+	 * @var string
+	 */
+	private $currentChar;
+
+	/**
+	 * @var int
+	 */
+	private $currentNestingLevel = 0;
+
+	/**
 	 * JsonStreamParser constructor.
 	 *
 	 * @param Configuration $config
@@ -76,87 +91,92 @@ class JsonStreamParser
 
 	private function doParse()
 	{
-		$nestingLevel = 0;
+		$this->currentNestingLevel = 0;
 
-		$generator = $this->buffer->get();
-		foreach ($generator as $char) {
-			switch ($char) {
-				case JsonDefinition::BEGIN_OBJECT:
-					$nestingLevel++;
-					$this->decoder->beginObject();
-				break;
-
-				case JsonDefinition::END_OBJECT:
-					$nestingLevel--;
-					$this->decoder->endObject();
-				break;
-
-				case JsonDefinition::BEGIN_ARRAY:
-					$nestingLevel++;
-					$this->decoder->beginArray();
-				break;
-
-				case JsonDefinition::END_ARRAY:
-					$nestingLevel--;
-					$this->decoder->endArray();
-				break;
-
-				case JsonDefinition::ARRAY_SEPARATOR:
-					$this->decoder->arraySeparator();
-				break;
-
-				case JsonDefinition::KEY_VALUE_SEPARATOR:
-					$this->decoder->keyValueSeparator();
-				break;
-
-				case JsonDefinition::STRING_ENCLOSURE:
-					$string = $this->consumeString($generator);
-					$this->decoder->appendValue($string);
-				break;
-
-				default:
-					if ($this->isWhitespace($char)) {
-						$this->decoder->whitespace($char);
-						continue;
-					}
-
-					if ($this->isStartOfKeyword($char)) {
-						$value = $this->consumeKeyword($generator);
-						$this->decoder->appendValue($value);
-						continue;
-					}
-
-					if (is_numeric($char)) {
-						$value = $this->consumeNumber($generator);
-						$this->decoder->appendValue($value);
-						continue;
-					}
-
-					throw new ParseException("Unknown character: $char");
-			}
+		$this->generator = $this->buffer->get();
+		foreach ($this->generator as $char) {
+			$this->currentChar = $char;
+			$this->processChar();
 		}
 
-		if ($nestingLevel != 0) {
+		if ($this->currentNestingLevel != 0) {
 			throw new ParseException('Unexpected end of stream');
 		}
 
 		$this->decoder->endOfStream();
 	}
 
+	private function processChar()
+	{
+		switch ($this->currentChar) {
+			case JsonDefinition::BEGIN_OBJECT:
+				$this->currentNestingLevel++;
+				$this->decoder->beginObject();
+			break;
+
+			case JsonDefinition::END_OBJECT:
+				$this->currentNestingLevel--;
+				$this->decoder->endObject();
+			break;
+
+			case JsonDefinition::BEGIN_ARRAY:
+				$this->currentNestingLevel++;
+				$this->decoder->beginArray();
+			break;
+
+			case JsonDefinition::END_ARRAY:
+				$this->currentNestingLevel--;
+				$this->decoder->endArray();
+			break;
+
+			case JsonDefinition::ARRAY_SEPARATOR:
+				$this->decoder->arraySeparator();
+			break;
+
+			case JsonDefinition::KEY_VALUE_SEPARATOR:
+				$this->decoder->keyValueSeparator();
+			break;
+
+			case JsonDefinition::STRING_ENCLOSURE:
+				$string = $this->consumeString();
+				$this->decoder->appendValue($string);
+			break;
+
+			default:
+				if ($this->isWhitespace()) {
+					$this->decoder->whitespace($this->currentChar);
+				} elseif ($this->isStartOfKeyword($this->currentChar)) {
+					$value = $this->consumeKeyword();
+					$this->decoder->appendValue($value);
+				} elseif (is_numeric($this->currentChar)) {
+					$value = $this->consumeNumber();
+					$this->decoder->appendValue($value);
+
+					// if the generator has not closed behind the number,
+					// consumeNumber walks one character too far.
+					// this character needs to be processed
+					if ($this->generator->valid()) {
+						$this->processChar();
+					}
+				} else {
+					throw new ParseException("Unknown character: {$this->currentChar}");
+				}
+			break;
+		}
+	}
+
 	/**
-	 * @param \Generator $generator
-	 *
 	 * @return string
 	 * @throws ParseException
 	 */
-	private function consumeString(\Generator $generator): string
+	private function consumeString(): string
 	{
 		$string = '';
 
 		// the cursor is at the opening enclosure, so advance
-		$generator->next();
-		while ($generator->valid()) {
-			$char = $generator->current();
+		$this->generator->next();
+		while ($this->generator->valid()) {
+			$char = $this->generator->current();
 
 			// read until we reach another enclosure
 			if ($char === JsonDefinition::STRING_ENCLOSURE) {
@@ -166,7 +186,7 @@ class JsonStreamParser
 			$string .= $char;
 
 			// keep this after the return; otherwise the foreach of doParse will skip one char
-			$generator->next();
+			$this->generator->next();
 		}
 
 		// if we end up here, we never got an enclosure
@@ -185,46 +205,54 @@ class JsonStreamParser
 	}
 
 	/**
-	 * @param \Generator $generator
-	 *
 	 * @return bool|null
 	 * @throws ParseException
 	 */
-	private function consumeKeyword(\Generator $generator)
+	private function consumeKeyword()
 	{
 		$keyword = '';
 
 		// cursor is already on the first character
 		do {
-			$keyword .= mb_strtolower($generator->current());
+			$keyword .= mb_strtolower($this->generator->current());
 
 			if (array_key_exists($keyword, JsonDefinition::KEYWORDS)) {
 				return JsonDefinition::KEYWORDS[$keyword];
 			}
 
-			$generator->next();
-		} while ($generator->valid());
+			$this->generator->next();
+		} while ($this->generator->valid());
 
 		// there was a typo
 		throw new ParseException('Encountered end of stream while inside a keyword.');
 	}
 
 	/**
-	 * @param \Generator $generator
-	 *
 	 * @return float|int
 	 * @throws ParseException
 	 */
-	private function consumeNumber(\Generator $generator)
+	private function consumeNumber()
 	{
-		$number = '';
-		$isInt  = true;
+		$number           = '';
+		$isInt            = true;
+		$numberCharacters = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.', 'e'];
 
 		// cursor is already on the first character
 		do {
-			$number .= mb_strtolower($generator->current());
-			$generator->next();
-		} while ($generator->valid());
+			$this->currentChar = mb_strtolower($this->generator->current());
+			if (!in_array($this->currentChar, $numberCharacters)) {
+				// number has ended, see if it really was a number
+				if (!is_numeric($number)) {
+					throw new ParseException("Unknown number format: $number");
+				}
+				break;
+			} elseif ($this->currentChar == '.') {
+				$isInt = false;
+			}
+
+			$number .= $this->currentChar;
+			$this->generator->next();
+		} while ($this->generator->valid());
 
 		if ($isInt) {
 			return (int)$number;
@@ -234,12 +262,10 @@ class JsonStreamParser
 	}
 
 	/**
-	 * @param string $char
-	 *
 	 * @return bool
 	 */
-	private function isWhitespace(string $char): bool
+	private function isWhitespace(): bool
 	{
-		return in_array($char, JsonDefinition::WHITESPACE);
+		return in_array($this->currentChar, JsonDefinition::WHITESPACE);
 	}
 }
