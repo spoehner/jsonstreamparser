@@ -180,7 +180,8 @@ class JsonStreamParser
 
 			// read until we reach another enclosure
 			if ($char === JsonDefinition::STRING_ENCLOSURE) {
-				return $string;
+				$decodedString = json_decode('"'.$string.'"');
+				return $decodedString;
 			}
 
 			$string .= $char;

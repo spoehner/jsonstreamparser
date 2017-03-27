@@ -268,6 +268,25 @@ class JsonStreamParserTest extends TestCase
 		$subject->parse($this->stream);
 	}
 
+	/**
+	 * @param string $string
+	 *
+	 * @dataProvider specialProvider
+	 */
+	public function testParseSpecialCharacters(string $string)
+	{
+		$this->fillStream(json_encode($string));
+		$this->decoder->expects($this->once())->method('appendValue')->with($string);
+
+		$subject = new JsonStreamParser($this->configuration, $this->decoder);
+		$subject->parse($this->stream);
+	}
+
+	public function specialProvider()
+	{
+		return [['üâé'], ['\x07']];
+	}
+
 	public function testParse()
 	{
 		$this->decoder->expects($this->once())->method('endOfStream');
